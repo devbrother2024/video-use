@@ -35,6 +35,7 @@
     { "pattern": "페이블|페에이블|페블", "replacement": "Fable", "note": "개발동생 채널에서 단독 페이블은 사실상 항상 Fable 모델 (우화 의미 등장 없음). 테이블은 계속 제외. 2026-06-12 단독 치환으로 승격 (Loop Engineering 전사 47건)" },
     { "pattern": "오퍼스|오프스|오푸스", "replacement": "Opus", "note": "오픈스/오픈소 excluded — collides with 오픈소스" },
     { "pattern": "글래스\\s*윙", "replacement": "Glasswing" },
+    { "pattern": "엑스(?!칼)", "replacement": "X", "note": "X(트위터) — 엑스칼리드로우(Excalidraw)는 lookahead로 보호. added 2026-06-12 (Loop Engineering 자막 피드백)" },
     { "pattern": "(?<![가-힣])파이브", "replacement": "5", "note": "lookbehind keeps 하이파이브 etc. intact" }
   ]
 }
