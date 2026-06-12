@@ -1,0 +1,27 @@
+{
+  "_readme": "Example banned-word config for Korean B2B client deliveries cut from live recordings. Copy and adapt per delivery — terms here are scanned over a fresh transcript of the FINAL render (verify_output.py --banned-words). whitelist_contexts suppress product-UI phrases that contain a banned term but are legitimate content.",
+  "banned": [
+    "라이브",
+    "구독",
+    "댓글",
+    "채팅",
+    "시청자",
+    "좋아요",
+    "알림설정",
+    "이 영상",
+    "유튜브 채널",
+    "제 채널",
+    "강의 자료 링크",
+    "채팅창"
+  ],
+  "whitelist_contexts": [
+    "채팅 히스토리",
+    "채팅 스레드",
+    "채팅 내역",
+    "채팅 기록",
+    "라이브러리",
+    "라이브 서버",
+    "구독 모델",
+    "구독료"
+  ]
+}
