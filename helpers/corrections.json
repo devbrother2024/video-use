@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "_readme": "Permanent ASR correction table (see corrections.py). When you find a transcription error, add it HERE — never fix it inline. Ambiguous terms that are real Korean words in other contexts (리소스, 테이블) belong in phrase_merges where surrounding context protects them, NOT in regex_replacements.",
+  "phrase_merges": [
+    {
+      "match": ["미소스|밋소스|빗소스|윗소스|토소스|리소스|밑소스", "파이브(.*)"],
+      "replacement": "Mythos 5\\1",
+      "note": "리소스 is a real word (resource) — only safe with the 파이브 context"
+    },
+    {
+      "match": ["페이블|테이블|페블|페에이블", "(?:파이브|사이브)(.*)"],
+      "replacement": "Fable 5\\1",
+      "note": "테이블 is a real word (table/DB) — only safe with the 파이브 context. 사이브 variant added 2026-06-12"
+    },
+    {
+      "match": ["오픈스|오퍼스|오프스|오푸스", "사", "점", "팔(.*)"],
+      "replacement": "Opus 4.8\\1"
+    },
+    {
+      "match": ["오픈사", "점", "칠(.*)"],
+      "replacement": "Opus 4.7\\1",
+      "note": "오픈사 = Opus 4 연음 오인식. added 2026-06-12 (Loop Engineering 전사)"
+    },
+    {
+      "match": ["오픈사", "점", "팔(.*)"],
+      "replacement": "Opus 4.8\\1"
+    }
+  ],
+  "regex_replacements": [
+    { "pattern": "클로드", "replacement": "Claude" },
+    { "pattern": "엔트로픽|앤트로픽", "replacement": "Anthropic" },
+    { "pattern": "미소스|밋소스|빗소스|윗소스|밑소스|미토스", "replacement": "Mythos", "note": "리소스/토소스 deliberately excluded — too close to real words. 미토스 added 2026-06-12 (Loop Engineering 전사)" },
+    { "pattern": "오픈클로", "replacement": "OpenClaw", "note": "added 2026-06-12 (Loop Engineering 전사)" },
+    { "pattern": "페이블파이브|페이블사이브", "replacement": "Fable 5", "note": "한 토큰으로 붙은 변형 — 단독 페이블 치환보다 먼저 적용되어야 함. added 2026-06-12" },
+    { "pattern": "페이블|페에이블|페블", "replacement": "Fable", "note": "개발동생 채널에서 단독 페이블은 사실상 항상 Fable 모델 (우화 의미 등장 없음). 테이블은 계속 제외. 2026-06-12 단독 치환으로 승격 (Loop Engineering 전사 47건)" },
+    { "pattern": "오퍼스|오프스|오푸스", "replacement": "Opus", "note": "오픈스/오픈소 excluded — collides with 오픈소스" },
+    { "pattern": "글래스\\s*윙", "replacement": "Glasswing" },
+    { "pattern": "(?<![가-힣])파이브", "replacement": "5", "note": "lookbehind keeps 하이파이브 etc. intact" }
+  ]
+}

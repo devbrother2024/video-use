@@ -24,13 +24,14 @@ These are the things where deviation produces silent failures or broken output. 
 3. **30ms audio fades at every segment boundary** (`afade=t=in:st=0:d=0.03,afade=t=out:st={dur-0.03}:d=0.03`). Otherwise audible pops at every cut.
 4. **Overlays use `setpts=PTS-STARTPTS+T/TB`** to shift the overlay's frame 0 to its window start. Otherwise you see the middle of the animation during the overlay window.
 5. **Master SRT uses output-timeline offsets**: `output_time = word.start - segment_start + segment_offset`. Otherwise captions misalign after segment concat.
-6. **Never cut inside a word.** Snap every cut edge to a word boundary from the Scribe transcript.
-7. **Pad every cut edge.** Working window: 30–200ms. Scribe timestamps drift 50–100ms — padding absorbs the drift. Tighter for fast-paced, looser for cinematic.
-8. **Word-level verbatim ASR only.** Never SRT/phrase mode (loses sub-second gap data). Never normalized fillers (loses editorial signal).
+6. **Never cut inside a word.** Snap every cut edge to a word boundary from the Scribe transcript. Enforced as code: `edl_check.py snap` does the snapping, and `render.py` lints the EDL before rendering and refuses on violations (`--skip-lint` to override for transcript-less footage).
+7. **Pad every cut edge.** Working window: 30–200ms. Scribe timestamps drift 50–100ms — padding absorbs the drift. Tighter for fast-paced, looser for cinematic. `edl_check.py snap` applies asymmetric padding (lead 50ms / tail 80ms) automatically.
+8. **ElevenLabs Scribe only for video transcription.** For `video-use` work, always use ElevenLabs Scribe through `helpers/transcribe.py` or the Scribe API. Do not use Whisper, whisper-cpp, local STT, or OS dictation for video review/editing transcripts. If ElevenLabs is unavailable, stop and ask the user instead of falling back silently. Keep word-level verbatim ASR; never SRT/phrase mode (loses sub-second gap data), and never normalized fillers (loses editorial signal).
 9. **Cache transcripts per source.** Never re-transcribe unless the source file itself changed.
 10. **Parallel sub-agents for multiple animations.** Never sequential. Spawn N at once via the `Agent` tool; total wall time ≈ slowest one.
 11. **Strategy confirmation before execution.** Never touch the cut until the user has approved the plain-English plan.
-12. **All session outputs in `<videos_dir>/edit/`.** Never write inside the `video-use/` project directory.
+12. **All session outputs in `<videos_dir>/edit/`.** Never write inside the `video-use/` project directory. (One deliberate exception: rule 13's correction table lives in the repo because it is a permanent skill asset, not session output.)
+13. **Transcription term fixes are permanent.** When ASR mangles a term (클로드 → Claude), add it to `helpers/corrections.json` — never fix it inline in one transcript. The table re-applies to cached transcripts automatically on the next `transcribe.py` call. Ambiguous terms that are real words in other contexts (리소스, 테이블) go in `phrase_merges`, not `regex_replacements`. (Added 2026-06-12 — inline fixes were being lost between sessions.)
 
 Everything else in this document is a worked example. Deviate whenever the material calls for it.
 
@@ -45,12 +46,13 @@ The skill lives in `video-use/`. User footage lives wherever they put it. All se
     ├── project.md               ← memory; appended every session
     ├── takes_packed.md          ← phrase-level transcripts, the LLM's primary reading view
     ├── edl.json                 ← cut decisions
-    ├── transcripts/<name>.json  ← cached raw Scribe JSON
+    ├── edl.source.json          ← pre-snap backup written by edl_check.py snap
+    ├── transcripts/<name>.json  ← cached Scribe JSON (corrections applied, originals in raw_text)
     ├── animations/slot_<id>/    ← per-animation source + render + reasoning
     ├── clips_graded/            ← per-segment extracts with grade + fades
     ├── master.srt               ← output-timeline subtitles
     ├── downloads/               ← yt-dlp outputs
-    ├── verify/                  ← debug frames / timeline PNGs
+    ├── verify/                  ← debug frames / timeline PNGs / report.md (verify_output.py)
     ├── preview.mp4
     └── final.mp4
 ```
@@ -75,8 +77,11 @@ Helpers (`helpers/transcribe.py`, `helpers/render.py`, etc.) live alongside this
 - **`transcribe_batch.py <videos_dir>`** — 4-worker parallel transcription. Use for multi-take.
 - **`pack_transcripts.py --edit-dir <dir>`** — `transcripts/*.json` → `takes_packed.md` (phrase-level, break on silence ≥ 0.5s).
 - **`timeline_view.py <video> <start> <end>`** — filmstrip + waveform PNG. On-demand visual drill-down. **Not a scan tool** — use it at decision points, not constantly.
-- **`render.py <edl.json> -o <out>`** — per-segment extract → concat → overlays (PTS-shifted) → subtitles LAST. `--preview` for 720p fast. `--build-subtitles` to generate master.srt inline.
+- **`render.py <edl.json> -o <out>`** — per-segment extract → concat → overlays (PTS-shifted) → subtitles LAST. `--preview` for 720p fast. `--build-subtitles` to generate master.srt inline. Lints the EDL first and refuses to render violations (`--skip-lint` to override).
 - **`grade.py <in> -o <out>`** — ffmpeg filter chain grade. Presets + `--filter '<raw>'` for custom.
+- **`edl_check.py snap|lint <edl.json>`** — snap every cut edge to a word boundary + drift padding (Hard Rules 6/7 as code, pre-snap backup to `edl.source.json`); lint catches word-interior cuts, inverted/out-of-source ranges, bad overlay windows, stale `total_duration_s`.
+- **`verify_output.py <out> --edl <edl.json>`** — post-render machine verification: output duration vs EDL (segment-scaled tolerance), stream profile, and `--banned-words <cfg.json>` for client deliveries — re-transcribes the final output and proves no live-stream chatter survived (see `helpers/examples/banned_words_delivery_kr.json`). Writes `verify/report.md` as the PASS evidence.
+- **`corrections.py apply <transcript.json>`** — apply the permanent ASR term table (`corrections.json`, Hard Rule 13). Runs automatically inside `transcribe.py` on both fresh and cached transcripts.
 
 For animations, create `<edit>/animations/slot_<id>/` with `Bash` and spawn a sub-agent via the `Agent` tool.
 
@@ -86,7 +91,7 @@ For animations, create `<edit>/animations/slot_<id>/` with `Bash` and spawn a su
 2. **Pre-scan for problems.** One pass over `takes_packed.md` to note verbal slips, obvious mis-speaks, or phrasings to avoid. Plain list, feed into the editor brief.
 3. **Converse.** Describe what you see in plain English. Ask questions *shaped by the material*. Collect: content type, target length/aspect, aesthetic/brand direction, pacing feel, must-preserve moments, must-cut moments, animation and grade preferences, subtitle needs. Do not use a fixed checklist — the right questions are different every time.
 4. **Propose strategy.** 4–8 sentences: shape, take choices, cut direction, animation plan, grade direction, subtitle style, length estimate. **Wait for confirmation.**
-5. **Execute.** Produce `edl.json` via the editor sub-agent brief. Drill into `timeline_view` at ambiguous moments. Build animations in parallel sub-agents. Apply grade per-segment. Compose via `render.py`.
+5. **Execute.** Produce `edl.json` via the editor sub-agent brief, then `edl_check.py snap edit/edl.json` to mechanically snap + pad every edge (render lints again regardless). Drill into `timeline_view` at ambiguous moments. Build animations in parallel sub-agents. Apply grade per-segment. Compose via `render.py`.
 6. **Preview.** `render.py --preview`.
 7. **Self-eval (before showing the user).** Run `timeline_view` on the **rendered output** (not the sources) at every cut boundary (±1.5s window). Check each image for:
    - Visual discontinuity / flash / jump at the cut
@@ -94,7 +99,7 @@ For animations, create `<edit>/animations/slot_<id>/` with `Bash` and spawn a su
    - Subtitle hidden behind an overlay (Rule 1 violation)
    - Overlay misaligned or showing wrong frames (Rule 4 violation)
 
-   Also sample: first 2s, last 2s, and 2–3 mid-points — check grade consistency, subtitle readability, overall coherence. Run `ffprobe` on the output to verify duration matches the EDL expectation.
+   Also sample: first 2s, last 2s, and 2–3 mid-points — check grade consistency, subtitle readability, overall coherence. Run `verify_output.py <out> --edl edit/edl.json` for the machine checks (duration vs EDL, stream profile → `verify/report.md`). For client deliveries cut from live recordings, add `--banned-words` so the final output is re-transcribed and scanned — a banned term that survived the cut is a FAIL, not a judgment call.
 
    If anything fails: fix → re-render → re-eval. **Cap at 3 self-eval passes** — if issues remain after 3, flag them to the user rather than looping forever. Only present the preview once the self-eval passes.
 8. **Iterate + persist.** Natural-language feedback, re-plan, re-render. Never re-transcribe. Final render on confirmation. Append to `project.md`.

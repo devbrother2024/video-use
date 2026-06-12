@@ -87,6 +87,23 @@ def call_scribe(
     return resp.json()
 
 
+def apply_corrections(transcript_path: Path, verbose: bool = True) -> None:
+    """Apply the permanent ASR correction table (helpers/corrections.json).
+
+    Runs on fresh saves AND on cache hits, so growing the table retroactively
+    fixes cached transcripts (idempotent — originals kept in raw_text).
+    Never blocks transcription: failures only warn.
+    """
+    try:
+        import corrections  # same directory
+
+        n = corrections.apply_file(transcript_path)
+        if n and verbose:
+            print(f"  corrections: {n} term fix(es) applied ({transcript_path.name})")
+    except Exception as exc:  # noqa: BLE001 — corrections must never break transcription
+        print(f"  warning: corrections not applied ({exc})")
+
+
 def transcribe_one(
     video: Path,
     edit_dir: Path,
@@ -106,6 +123,7 @@ def transcribe_one(
     if out_path.exists():
         if verbose:
             print(f"cached: {out_path.name}")
+        apply_corrections(out_path, verbose=verbose)
         return out_path
 
     if verbose:
@@ -121,6 +139,7 @@ def transcribe_one(
         payload = call_scribe(audio, api_key, language, num_speakers)
 
     out_path.write_text(json.dumps(payload, indent=2))
+    apply_corrections(out_path, verbose=verbose)
     dt = time.time() - t0
 
     if verbose:
