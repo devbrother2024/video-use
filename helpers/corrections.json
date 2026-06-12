@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "_readme": "Permanent ASR correction table (see corrections.py). When you find a transcription error, add it HERE — never fix it inline. Ambiguous terms that are real Korean words in other contexts (리소스, 테이블) belong in phrase_merges where surrounding context protects them, NOT in regex_replacements.",
+  "phrase_merges": [
+    {
+      "match": ["미소스|밋소스|빗소스|윗소스|토소스|리소스|밑소스", "파이브(.*)"],
+      "replacement": "Mythos 5\\1",
+      "note": "리소스 is a real word (resource) — only safe with the 파이브 context"
+    },
+    {
+      "match": ["페이블|테이블|페블|페에이블", "파이브(.*)"],
+      "replacement": "Fable 5\\1",
+      "note": "테이블 is a real word (table/DB) — only safe with the 파이브 context"
+    },
+    {
+      "match": ["오픈스|오퍼스|오프스|오푸스", "사", "점", "팔(.*)"],
+      "replacement": "Opus 4.8\\1"
+    }
+  ],
+  "regex_replacements": [
+    { "pattern": "클로드", "replacement": "Claude" },
+    { "pattern": "엔트로픽|앤트로픽", "replacement": "Anthropic" },
+    { "pattern": "미소스|밋소스|빗소스|윗소스|밑소스", "replacement": "Mythos", "note": "리소스/토소스 deliberately excluded — too close to real words" },
+    { "pattern": "페에이블", "replacement": "Fable", "note": "페이블/테이블 deliberately excluded — 페이블 fable(우화), 테이블 table" },
+    { "pattern": "오퍼스|오프스|오푸스", "replacement": "Opus", "note": "오픈스/오픈소 excluded — collides with 오픈소스" },
+    { "pattern": "글래스\\s*윙", "replacement": "Glasswing" },
+    { "pattern": "(?<![가-힣])파이브", "replacement": "5", "note": "lookbehind keeps 하이파이브 etc. intact" }
+  ]
+}
