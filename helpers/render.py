@@ -37,6 +37,11 @@ except Exception:
     def auto_grade_for_clip(video, start=0.0, duration=None, verbose=False):  # type: ignore
         return "eq=contrast=1.03:saturation=0.98", {}
 
+try:
+    from edl_check import lint_for_render  # same directory
+except Exception:
+    lint_for_render = None
+
 
 # -------- Subtitle style (bold-overlay, proven at 1920×1080 and 1080×1920) --
 #
@@ -584,6 +589,11 @@ def main() -> None:
         action="store_true",
         help="Skip audio loudness normalization. Default is on (-14 LUFS, -1 dBTP, LRA 11).",
     )
+    ap.add_argument(
+        "--skip-lint",
+        action="store_true",
+        help="Skip the pre-render EDL lint (word-boundary / duration / overlay checks).",
+    )
     args = ap.parse_args()
 
     edl_path = args.edl.resolve()
@@ -593,6 +603,25 @@ def main() -> None:
     edl = json.loads(edl_path.read_text())
     edit_dir = edl_path.parent
     out_path = args.output.resolve()
+
+    # 0. Pre-render lint — refuse to render an EDL that cuts inside words or
+    #    references invalid windows (Hard Rules 6/7 enforced as code).
+    if args.skip_lint:
+        print("pre-render lint: skipped (--skip-lint)")
+    elif lint_for_render is None:
+        print("warning: edl_check.py unavailable — pre-render lint skipped")
+    else:
+        lint_errors, lint_warnings = lint_for_render(edl, edit_dir)
+        for w in lint_warnings:
+            print(f"  lint warning: {w}")
+        if lint_errors:
+            for e in lint_errors:
+                print(f"  lint ERROR: {e}")
+            sys.exit(
+                f"EDL lint failed: {len(lint_errors)} error(s). "
+                f"Fix the EDL (or snap it: python helpers/edl_check.py snap {edl_path.name}), "
+                f"or rerun with --skip-lint."
+            )
 
     # 1. Extract per-segment (auto-grade per range if EDL grade is "auto")
     segment_paths = extract_all_segments(
