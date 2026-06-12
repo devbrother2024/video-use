@@ -1,4 +1,4 @@
-from verify_output import check_duration, scan_banned
+from verify_output import check_duration, check_profile, scan_banned
 
 
 def W(text, start, end):
@@ -50,6 +50,20 @@ def test_check_duration_mismatch_fails():
     edl = {"ranges": [{"source": "C01", "start": 0.0, "end": 10.0}], "total_duration_s": 10.0}
     errors, _ = check_duration(12.5, edl, tol=0.2)
     assert errors
+
+
+def test_check_profile_enforces_every_declared_field():
+    info = {
+        "width": 1920, "height": 1080, "fps": 24.0,
+        "pix_fmt": "yuv420p", "vcodec": "h264",
+        "acodec": "aac", "sample_rate": "48000", "channels": 1,
+    }
+    edl = {"output": {"pix_fmt": "yuv420p10le", "sample_rate": 48000, "channels": 2}}
+    errors, _ = check_profile(info, edl)
+    assert any("pix_fmt" in e for e in errors)
+    assert any("channels" in e for e in errors)
+    # sample_rate matches across int/str representations — no error
+    assert not any("sample_rate" in e for e in errors)
 
 
 def test_check_duration_tolerance_scales_with_segment_count():

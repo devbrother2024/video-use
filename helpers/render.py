@@ -37,9 +37,12 @@ except Exception:
     def auto_grade_for_clip(video, start=0.0, duration=None, verbose=False):  # type: ignore
         return "eq=contrast=1.03:saturation=0.98", {}
 
+# ImportError only: a missing edl_check degrades gracefully (warned in main),
+# but a syntax/runtime error inside it must fail fast — silently disabling the
+# lint gate is exactly the failure mode the gate exists to prevent.
 try:
     from edl_check import lint_for_render  # same directory
-except Exception:
+except ImportError:
     lint_for_render = None
 
 

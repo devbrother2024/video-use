@@ -56,11 +56,15 @@ def _try_merge(words: list[dict], start_idx: int, rule: dict) -> dict | None:
     idx = start_idx
     last_match: re.Match | None = None
     for pat in patterns:
-        while idx < len(words) and words[idx].get("type") != "word":
+        # Only spacing may separate the phrase — an audio_event or any other
+        # structured token between the words must survive, so abort the merge.
+        while idx < len(words) and words[idx].get("type") == "spacing":
             idx += 1
         if idx >= len(words):
             return None
         token = words[idx]
+        if token.get("type") != "word":
+            return None
         if token.get("merged"):
             return None
         m = re.fullmatch(pat, _base_text(token))

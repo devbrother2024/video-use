@@ -68,3 +68,13 @@ def test_non_word_tokens_pass_through():
     out, n = apply_to_words(words, TABLE)
     assert n == 0
     assert out[0]["text"] == "(laughs)"
+
+
+def test_phrase_merge_aborts_on_interleaved_audio_event():
+    # an audio_event between the phrase words must survive — no silent deletion
+    event = {"type": "audio_event", "text": "(laughs)", "start": 1.45, "end": 1.48}
+    words = [W("미소스", 1.0, 1.4), event, W("파이브라고", 1.5, 2.0)]
+    out, _ = apply_to_words(words, TABLE)
+    assert event in out
+    texts = [w["text"] for w in out if w.get("type") == "word"]
+    assert "미소스" in texts[0]  # merge aborted, original token kept

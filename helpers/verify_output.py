@@ -113,10 +113,12 @@ def check_profile(info: dict, edl: dict) -> tuple[list[str], list[str]]:
     profile = edl.get("output")
     if not isinstance(profile, dict):
         return errors, notes
-    for key, probed in (("width", info.get("width")), ("height", info.get("height"))):
+    # Every declared field is enforced (str-compared — EDL authors may write
+    # 48000 or "48000"); fps gets a small tolerance for NTSC-style rates.
+    for key in ("width", "height", "pix_fmt", "vcodec", "acodec", "sample_rate", "channels"):
         want = profile.get(key)
-        if want is not None and probed != want:
-            errors.append(f"profile mismatch: {key} {probed} != requested {want}")
+        if want is not None and str(info.get(key)) != str(want):
+            errors.append(f"profile mismatch: {key} {info.get(key)} != requested {want}")
     want_fps = profile.get("fps")
     if want_fps is not None and abs(float(info.get("fps", 0)) - float(want_fps)) > 0.06:
         errors.append(f"profile mismatch: fps {info.get('fps')} != requested {want_fps}")

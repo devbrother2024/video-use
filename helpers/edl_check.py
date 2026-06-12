@@ -34,6 +34,9 @@ MAX_SNAP = 0.5        # edges farther than this from any word are left alone
 WORD_INTERIOR_MARGIN = 0.02  # tolerance before an edge counts as inside a word
 NEIGHBOR_GAP = 0.005  # minimum clearance kept from a neighboring word
 DURATION_TOL = 0.2    # allowed drift for total_duration_s and overlay ends
+MIN_PAD_WARN = 0.03   # warn when an edge has less drift padding than Hard Rule 7's floor
+# No upper-bound padding warning: cuts inside long silences legitimately sit
+# hundreds of ms from the nearest word (silences >=400ms are preferred targets).
 
 
 def words_of(transcript: dict) -> list[dict]:
@@ -187,12 +190,19 @@ def lint_edl(
         start, end = float(r["start"]), float(r["end"])
         tag = f"range[{i:02d}] {src} {start:.2f}-{end:.2f}"
 
+        if src not in (edl.get("sources") or {}):
+            errors.append(f"{tag}: unknown source '{src}' — not in edl sources")
+            continue
+
         if end <= start:
             errors.append(f"{tag}: end <= start")
             continue
 
+        # start < 0 must fail even when the source duration cannot be probed
+        if start < 0:
+            errors.append(f"{tag}: start < 0")
         src_dur = source_durations.get(src)
-        if src_dur is not None and (end > src_dur + DURATION_TOL or start < 0):
+        if src_dur is not None and end > src_dur + DURATION_TOL:
             errors.append(f"{tag}: exceeds source duration ({src_dur:.2f}s)")
 
         words = words_by_source.get(src)
@@ -209,10 +219,10 @@ def lint_edl(
                 )
                 continue
             pad = _edge_padding(t, words, is_start)
-            if pad is not None and pad < 0.005:
+            if pad is not None and pad < MIN_PAD_WARN:
                 warnings.append(
-                    f"{tag}: {label} sits exactly on the word boundary — "
-                    f"no drift padding (Hard Rule 7, want 30-200ms)"
+                    f"{tag}: {label} padded only {pad * 1000:.0f}ms from the word boundary — "
+                    f"drift padding below the 30-200ms window (Hard Rule 7)"
                 )
 
     for src in sorted(no_transcript_sources):

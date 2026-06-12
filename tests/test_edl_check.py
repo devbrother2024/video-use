@@ -112,6 +112,19 @@ def test_lint_flags_range_beyond_source_duration():
     assert any("exceeds source duration" in e for e in errors)
 
 
+def test_lint_flags_unknown_source():
+    # a typo'd source must die in lint, not as a KeyError inside render
+    edl = make_edl([{"source": "C99", "start": 1.0, "end": 2.0}])
+    errors, _ = lint_edl(edl, {"C01": WORDS}, {"C01": 60.0})
+    assert any("unknown source" in e for e in errors)
+
+
+def test_lint_flags_negative_start_even_without_probed_duration():
+    edl = make_edl([{"source": "C01", "start": -0.5, "end": 2.0}])
+    errors, _ = lint_edl(edl, {"C01": None}, {"C01": None})  # ffprobe failed
+    assert any("start < 0" in e for e in errors)
+
+
 def test_lint_flags_total_duration_mismatch():
     edl = make_edl([{"source": "C01", "start": 0.95, "end": 3.08}], total=10.0)
     errors, _ = lint_edl(edl, {"C01": WORDS}, {"C01": 60.0})
